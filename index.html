@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BIHBV Monthly Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  :root {
+    --bg:#0a0e17; --surface:#111827; --surface2:#1a2235;
+    --border:rgba(255,255,255,0.07); --text:#e8eaf0; --muted:#6b7a99;
+    --teal:#14b8a6; --green:#22c55e; --amber:#f59e0b; --red:#f43f5e;
+    --blue:#3b82f6; --purple:#a78bfa; --coral:#fb7185;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
+
+  #loader{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;}
+  #loader h2{font-family:'DM Serif Display',serif;font-size:2rem;color:var(--teal);margin-bottom:12px;}
+  #loader p{color:var(--muted);font-family:'IBM Plex Mono',monospace;font-size:12px;}
+  .spinner{width:40px;height:40px;border:3px solid var(--surface2);border-top-color:var(--teal);border-radius:50%;animation:spin 0.8s linear infinite;margin-bottom:20px;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+
+
+  .header{padding:1.75rem 2.5rem 1.25rem;border-bottom:0.5px solid var(--border);display:flex;justify-content:space-between;align-items:flex-end;}
+  .header h1{font-family:'DM Serif Display',serif;font-size:2rem;font-weight:400;letter-spacing:-0.02em;line-height:1.1;}
+  .header p{color:var(--muted);font-size:12px;margin-top:4px;font-family:'IBM Plex Mono',monospace;letter-spacing:0.04em;}
+  .badge{display:inline-block;padding:4px 12px;border:0.5px solid var(--teal);border-radius:100px;font-size:11px;font-family:'IBM Plex Mono',monospace;color:var(--teal);letter-spacing:0.06em;text-transform:uppercase;}
+  .last-updated{font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-top:6px;text-align:right;}
+
+  .main{padding:1.75rem 2.5rem;display:grid;gap:1.25rem;}
+
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;}
+  .kpi-card{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1.25rem 1.5rem;position:relative;overflow:hidden;}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:12px 12px 0 0;}
+  .kpi-card.teal::before{background:var(--teal);}
+  .kpi-card.green::before{background:var(--green);}
+  .kpi-card.amber::before{background:var(--amber);}
+  .kpi-card.purple::before{background:var(--purple);}
+  .kpi-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;font-family:'IBM Plex Mono',monospace;}
+  .kpi-value{font-size:1.9rem;font-weight:600;margin-top:6px;line-height:1;}
+  .kpi-sub{margin-top:5px;font-size:12px;color:var(--muted);}
+  .kpi-delta{display:inline-flex;align-items:center;gap:3px;font-size:11px;font-weight:500;padding:2px 8px;border-radius:100px;margin-top:7px;}
+  .kpi-delta.pos{background:rgba(34,197,94,0.12);color:var(--green);}
+  .kpi-delta.neg{background:rgba(244,63,94,0.12);color:var(--red);}
+
+  .two-col{display:grid;grid-template-columns:1fr 1fr;gap:1.25rem;}
+  .panel{background:var(--surface);border:0.5px solid var(--border);border-radius:12px;padding:1.4rem;}
+  .panel-title{font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted);font-family:'IBM Plex Mono',monospace;margin-bottom:1.1rem;}
+
+  .country-row{display:flex;align-items:center;padding:7px 0;border-bottom:0.5px solid var(--border);}
+  .country-row:last-child{border-bottom:none;}
+  .country-flag{font-size:17px;margin-right:9px;}
+  .country-name{flex:1;font-size:13px;font-weight:500;}
+  .country-bar-wrap{flex:2;height:5px;background:rgba(255,255,255,0.06);border-radius:100px;margin:0 10px;overflow:hidden;}
+  .country-bar{height:100%;border-radius:100px;}
+  .country-val{font-size:11px;color:var(--muted);min-width:60px;text-align:right;font-family:'IBM Plex Mono',monospace;}
+  .country-par{font-size:11px;padding:2px 7px;border-radius:100px;margin-left:8px;min-width:44px;text-align:center;font-family:'IBM Plex Mono',monospace;}
+  .par-ok{background:rgba(34,197,94,0.1);color:var(--green);}
+  .par-warn{background:rgba(245,158,11,0.1);color:var(--amber);}
+  .par-alert{background:rgba(244,63,94,0.1);color:var(--red);}
+
+  .ratio-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;}
+  .ratio-item{background:var(--surface2);border-radius:8px;padding:11px 13px;}
+  .ratio-name{font-size:11px;color:var(--muted);margin-bottom:3px;}
+  .ratio-vals{display:flex;justify-content:space-between;align-items:baseline;}
+  .ratio-actual{font-size:17px;font-weight:600;}
+  .ratio-budget{font-size:11px;color:var(--muted);}
+  .bar-wrap{height:5px;background:rgba(255,255,255,0.06);border-radius:100px;margin-top:4px;overflow:hidden;}
+  .bar-fill{height:100%;border-radius:100px;}
+
+  .legend-row{display:flex;gap:16px;margin-bottom:10px;flex-wrap:wrap;}
+  .legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);}
+  .legend-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+  .chart-wrap{position:relative;width:100%;}
+  .divider{height:0.5px;background:var(--border);margin:12px 0;}
+
+  .ops-table{width:100%;border-collapse:collapse;font-size:12px;}
+  .ops-table th{font-size:10px;color:var(--muted);font-family:'IBM Plex Mono',monospace;text-transform:uppercase;letter-spacing:0.06em;padding:6px 10px;text-align:right;border-bottom:0.5px solid var(--border);white-space:nowrap;}
+  .ops-table th:first-child{text-align:left;}
+  .ops-table td{padding:7px 10px;border-bottom:0.5px solid rgba(255,255,255,0.04);text-align:right;font-family:'IBM Plex Mono',monospace;}
+  .ops-table td:first-child{text-align:left;font-family:'Inter',sans-serif;color:var(--muted);font-size:11px;}
+  .ops-table tr:last-child td{border-bottom:none;}
+  .ops-table tr:hover td{background:rgba(255,255,255,0.02);}
+
+  .footer{padding:1.25rem 2.5rem;border-top:0.5px solid var(--border);font-size:11px;color:var(--muted);display:flex;justify-content:space-between;font-family:'IBM Plex Mono',monospace;}
+</style>
+</head>
+<body>
+
+<div id="loader">
+  <div class="spinner"></div>
+  <h2>Loading Dashboard</h2>
+  <p>Fetching latest data from Google Sheets...</p>
+</div>
+
+
+<div id="dashboard" style="display:none;">
+  <div class="header">
+    <div>
+      <h1>BRAC International Holdings B.V.</h1>
+      <p>MONTHLY CONSOLIDATED SUMMARY &nbsp;·&nbsp; IN USD'000</p>
+    </div>
+    <div style="text-align:right;">
+      <div class="badge" id="period-badge">Loading...</div>
+      <div class="last-updated" id="last-updated"></div>
+    </div>
+  </div>
+
+  <div class="main">
+
+    <!-- ROW 1: KPI SCORECARDS — Total Assets | GLP | Borrowers | Savers -->
+    <div class="kpi-grid">
+      <div class="kpi-card teal">
+        <div class="kpi-label">Total Assets</div>
+        <div class="kpi-value" style="color:var(--teal);" id="kpi-assets">—</div>
+        <div class="kpi-sub" id="kpi-assets-sub">Budget: —</div>
+        <div class="kpi-delta" id="kpi-assets-delta">—</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-label">Gross Loan Portfolio</div>
+        <div class="kpi-value" style="color:var(--green);" id="kpi-glp">—</div>
+        <div class="kpi-sub" id="kpi-glp-sub">Budget: —</div>
+        <div class="kpi-delta" id="kpi-glp-delta">—</div>
+      </div>
+      <div class="kpi-card amber">
+        <div class="kpi-label">Total Borrowers</div>
+        <div class="kpi-value" style="color:var(--amber);" id="kpi-borrowers">—</div>
+        <div class="kpi-sub" id="kpi-borrowers-sub">Budget: —</div>
+        <div class="kpi-delta" id="kpi-borrowers-delta">—</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-label">Total Savers</div>
+        <div class="kpi-value" style="color:var(--purple);" id="kpi-savers">—</div>
+        <div class="kpi-sub" id="kpi-savers-sub">Budget: —</div>
+        <div class="kpi-delta" id="kpi-savers-delta">—</div>
+      </div>
+    </div>
+
+    <!-- ROW 2: Country Portfolio + Borrower Growth -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Gross Loan Portfolio — by Country (USD'000) · PAR&gt;30</div>
+        <div id="country-portfolio-list"></div>
+        <div style="margin-top:10px;padding-top:8px;border-top:0.5px solid var(--border);display:flex;gap:14px;font-size:11px;color:var(--muted);font-family:'IBM Plex Mono',monospace;">
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--green);display:inline-block;"></span>PAR &lt;3%</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--amber);display:inline-block;"></span>PAR 3–5%</span>
+          <span style="display:flex;align-items:center;gap:4px;"><span style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block;"></span>PAR &gt;5%</span>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Borrower Growth 2015–2025</div>
+        <div class="legend-row" id="borrower-legend"></div>
+        <div class="chart-wrap" style="height:220px;"><canvas id="borrowerChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ROW 3: KPI Ratios (1/3) + Net Profit chart (2/3 wide) -->
+    <div style="display:grid;grid-template-columns:1fr 2fr;gap:1.25rem;">
+      <div class="panel">
+        <div class="panel-title">Balance Sheet KPIs — Consolidated</div>
+        <div class="ratio-grid" id="bs-ratios"></div>
+        <div class="divider"></div>
+        <div class="panel-title" style="margin-bottom:9px;">P&amp;L KPIs — Consolidated</div>
+        <div class="ratio-grid" id="pl-ratios"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Net Profit vs Budget — by Country (USD'000, YTD)</div>
+        <div class="legend-row">
+          <div class="legend-item"><span class="legend-dot" style="background:rgba(107,122,153,0.6);"></span>Budget</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--teal);"></span>Actual</div>
+        </div>
+        <div class="chart-wrap" style="height:300px;"><canvas id="profitChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ROW 4: Disbursement by Country — FULL WIDTH -->
+    <div class="panel">
+      <div class="panel-title">YTD Disbursement vs Budget — by Country (USD'000)</div>
+      <div class="legend-row">
+        <div class="legend-item"><span class="legend-dot" style="background:rgba(107,122,153,0.6);"></span>Budget</div>
+        <div class="legend-item"><span class="legend-dot" style="background:var(--blue);"></span>Actual</div>
+      </div>
+      <div class="chart-wrap" style="height:230px;"><canvas id="disbChart"></canvas></div>
+    </div>
+
+    <!-- ROW 5: Operational KPIs by Country — FULL WIDTH TABLE -->
+    <div class="panel">
+      <div class="panel-title">Operational KPIs — by Country (Actual vs Budget, YTD Mar 2026)</div>
+      <div id="ops-table-wrap"></div>
+    </div>
+
+    <!-- ROW 6: Monthly Portfolio Trend + Cash -->
+    <div class="two-col">
+      <div class="panel">
+        <div class="panel-title">Gross Loan Portfolio — Monthly Trend 2026 (USD'000)</div>
+        <div class="legend-row">
+          <div class="legend-item"><span class="legend-dot" style="background:var(--teal);"></span>Budget</div>
+          <div class="legend-item"><span class="legend-dot" style="background:var(--blue);"></span>Actual</div>
+        </div>
+        <div class="chart-wrap" style="height:190px;"><canvas id="portfolioChart"></canvas></div>
+      </div>
+      <div class="panel">
+        <div class="panel-title">Cash &amp; Short-Term Deposits — by Country (USD'000)</div>
+        <div class="chart-wrap" style="height:190px;"><canvas id="cashChart"></canvas></div>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+
+  <div class="footer">
+    <span>Source: BIHBV Monthly Summary · Figures in USD'000 unless stated</span>
+    <span>BRAC International Holdings B.V. · Consolidated + Country Subsidiaries</span>
+  </div>
+</div><!-- /dashboard -->
+
+<script>
+// ─── CONFIG — replace with your Google Sheet ID ───────────────────────────────
+const SHEET_ID = '16vALRBFypf1b5g_oWYmDF4gM4KisKx34I4_p9X9el4I';
+const SHEETS   = { bs:'1_Balance_Sheet', kpi:'2_Strategic_KPIs', borrow:'3_Borrower_History', trend:'4_Monthly_Trend' };
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const COUNTRIES = ['Tanzania','Uganda','Myanmar','Liberia','Sierra Leone','Rwanda','Ghana'];
+const COLORS = { Tanzania:'#14b8a6',Uganda:'#3b82f6',Myanmar:'#a78bfa',Liberia:'#f59e0b','Sierra Leone':'#fb7185',Rwanda:'#22c55e',Ghana:'#e879f9',Kenya:'#f43f5e' };
+const FLAGS  = { Tanzania:'🇹🇿',Uganda:'🇺🇬',Myanmar:'🇲🇲',Liberia:'🇱🇷','Sierra Leone':'🇸🇱',Rwanda:'🇷🇼',Ghana:'🇬🇭',Kenya:'🇰🇪' };
+
+// ─── HELPERS ──────────────────────────────────────────────────────────────────
+async function fetchSheet(name) {
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(name)}`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Cannot fetch sheet: ${name}`);
+  return parseCSV(await res.text());
+}
+function parseCSV(text) {
+  const lines = text.trim().split('\n');
+  const headers = parseLine(lines[0]);
+  return lines.slice(1).map(line => {
+    const vals = parseLine(line), obj = {};
+    headers.forEach((h,i) => obj[h.replace(/^"|"$/g,'').trim()] = (vals[i]||'').replace(/^"|"$/g,'').trim());
+    return obj;
+  });
+}
+function parseLine(line) {
+  const r=[];let c='';let q=false;
+  for(let i=0;i<line.length;i++){const ch=line[i];if(ch==='"'){q=!q;}else if(ch===','&&!q){r.push(c);c='';}else c+=ch;}
+  r.push(c);return r;
+}
+function num(v){const n=parseFloat((v||'').replace(/,/g,''));return isNaN(n)?0:n;}
+function fmtM(v){return'$'+(v/1000).toFixed(1)+'M';}
+function fmtN(v){return Math.round(v).toLocaleString();}
+function pct(v){return(v*100).toFixed(1)+'%';}
+function setDelta(id,a,b){
+  const el=document.getElementById(id);if(!el||!b)return;
+  const d=((a-b)/Math.abs(b))*100;
+  el.className='kpi-delta '+(d>=0?'pos':'neg');
+  el.textContent=(d>=0?'▲ ':'▼ ')+Math.abs(d).toFixed(1)+'% vs budget';
+}
+
+Chart.defaults.color='#6b7a99';
+Chart.defaults.font.family="'IBM Plex Mono',monospace";
+Chart.defaults.font.size=11;
+const _charts={};
+function mkChart(id,cfg){if(_charts[id])_charts[id].destroy();_charts[id]=new Chart(document.getElementById(id),cfg);}
+
+// Data accessors
+function ka(kpi,m,c='Consolidated'){const r=kpi.find(x=>x.Metric===m&&x.Country===c);return r?num(r.Actual):0;}
+function kb(kpi,m,c='Consolidated'){const r=kpi.find(x=>x.Metric===m&&x.Country===c);return r?num(r.Budget):0;}
+function ba(bs,item,c='Consolidated'){const r=bs.find(x=>x['Line Item']===item&&x.Country===c);return r?num(r['YTD Actual (USD000)']):0;}
+function bb(bs,item,c='Consolidated'){const r=bs.find(x=>x['Line Item']===item&&x.Country===c);return r?num(r['YTD Budget (USD000)']):0;}
+
+// ─── RENDER: KPI SCORECARDS ───────────────────────────────────────────────────
+function renderKPIs(bs,kpi){
+  const ta=ba(bs,'TOTAL ASSETS'),taB=bb(bs,'TOTAL ASSETS');
+  const glp=ba(bs,'Gross loan portfolio'),glpB=bb(bs,'Gross loan portfolio');
+  const borr=ka(kpi,'Borrowers'),borrB=kb(kpi,'Borrowers');
+  const sav=ka(kpi,'Savers'),savB=kb(kpi,'Savers');
+  document.getElementById('kpi-assets').textContent=fmtM(ta);
+  document.getElementById('kpi-assets-sub').textContent='Budget: '+fmtM(taB);
+  setDelta('kpi-assets-delta',ta,taB);
+  document.getElementById('kpi-glp').textContent=fmtM(glp);
+  document.getElementById('kpi-glp-sub').textContent='Budget: '+fmtM(glpB);
+  setDelta('kpi-glp-delta',glp,glpB);
+  document.getElementById('kpi-borrowers').textContent=fmtN(borr);
+  document.getElementById('kpi-borrowers-sub').textContent='Budget: '+fmtN(borrB);
+  setDelta('kpi-borrowers-delta',borr,borrB);
+  document.getElementById('kpi-savers').textContent=fmtN(sav);
+  document.getElementById('kpi-savers-sub').textContent='Budget: '+fmtN(savB);
+  setDelta('kpi-savers-delta',sav,savB);
+}
+
+// ─── RENDER: COUNTRY PORTFOLIO ────────────────────────────────────────────────
+function renderCountryPortfolio(bs,kpi){
+  const data=COUNTRIES.map(c=>({name:c,flag:FLAGS[c]||'🌍',val:ba(bs,'Gross loan portfolio',c),par:ka(kpi,'PAR>30',c),color:COLORS[c]})).sort((a,b)=>b.val-a.val);
+  const max=data[0].val;
+  document.getElementById('country-portfolio-list').innerHTML=data.map(d=>{
+    const pc=d.par<0.03?'par-ok':d.par<0.05?'par-warn':'par-alert';
+    return `<div class="country-row">
+      <span class="country-flag">${d.flag}</span><span class="country-name">${d.name}</span>
+      <div class="country-bar-wrap"><div class="country-bar" style="width:${(d.val/max*100).toFixed(1)}%;background:${d.color};"></div></div>
+      <span class="country-val">${Math.round(d.val).toLocaleString()}</span>
+      <span class="country-par ${pc}">${pct(d.par)}</span>
+    </div>`;
+  }).join('');
+}
+
+// ─── RENDER: BORROWER GROWTH CHART ───────────────────────────────────────────
+function renderBorrowerChart(borrow){
+  const years=[...new Set(borrow.map(r=>r.Year))].sort();
+  document.getElementById('borrower-legend').innerHTML=COUNTRIES.map(c=>`<div class="legend-item"><span class="legend-dot" style="background:${COLORS[c]};"></span>${c}</div>`).join('');
+  mkChart('borrowerChart',{type:'bar',data:{labels:years,datasets:COUNTRIES.map(c=>({label:c,data:years.map(y=>{const r=borrow.find(b=>b.Country===c&&b.Year==y);return r?num(r.Borrowers):0;}),backgroundColor:COLORS[c],borderWidth:0}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.raw.toLocaleString()}}},
+      scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99',maxRotation:0}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>(v/1000).toFixed(0)+'k',color:'#6b7a99'}}}}});
+}
+
+// ─── RENDER: KPI RATIOS ───────────────────────────────────────────────────────
+function renderRatios(kpi){
+  const bsR=[
+    {name:'Solvency Ratio',  actual:pct(ka(kpi,'Solvency Ratio')),      budget:'B: '+pct(kb(kpi,'Solvency Ratio')),      w:ka(kpi,'Solvency Ratio')*100,color:'var(--teal)'},
+    {name:'Debt to Equity',  actual:ka(kpi,'Debt to Equity').toFixed(2)+'x', budget:'B: '+kb(kpi,'Debt to Equity').toFixed(2)+'x', w:40,color:'var(--blue)'},
+    {name:'Debt to Assets',  actual:pct(ka(kpi,'Debt to Assets')),      budget:'B: '+pct(kb(kpi,'Debt to Assets')),      w:ka(kpi,'Debt to Assets')*100,color:'var(--amber)'},
+    {name:'LLR / Loan Book', actual:pct(ka(kpi,'LLR / Loan Outstanding')), budget:'B: '+pct(kb(kpi,'LLR / Loan Outstanding')), w:15,color:'var(--coral)'},
+  ];
+  const plR=[
+    {name:'OSS',               actual:ka(kpi,'OSS').toFixed(2)+'x',         budget:'B: '+kb(kpi,'OSS').toFixed(2)+'x',         w:100,color:'var(--green)'},
+    {name:'Net Interest Margin',actual:pct(ka(kpi,'Net Interest Margin')),  budget:'B: '+pct(kb(kpi,'Net Interest Margin')),  w:ka(kpi,'Net Interest Margin')*100,color:'var(--purple)'},
+    {name:'Cost of Debt',      actual:pct(ka(kpi,'Cost of Debt')),          budget:'B: '+pct(kb(kpi,'Cost of Debt')),          w:40,color:'var(--amber)'},
+    {name:'Net Profit (YTD)', actual:'$'+ka(kpi,'Net Profit (USD000)').toFixed(0)+'k', budget:'B: $'+kb(kpi,'Net Profit (USD000)').toFixed(0)+'k', w:96,color:'var(--green)'},
+  ];
+  const html=arr=>arr.map(r=>`<div class="ratio-item"><div class="ratio-name">${r.name}</div><div class="ratio-vals"><span class="ratio-actual" style="color:${r.color};">${r.actual}</span><span class="ratio-budget">${r.budget}</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${Math.min(r.w,100)}%;background:${r.color};"></div></div></div>`).join('');
+  document.getElementById('bs-ratios').innerHTML=html(bsR);
+  document.getElementById('pl-ratios').innerHTML=html(plR);
+}
+
+// ─── RENDER: NET PROFIT CHART ─────────────────────────────────────────────────
+function renderProfitChart(kpi){
+  mkChart('profitChart',{type:'bar',data:{labels:COUNTRIES,datasets:[
+    {label:'Budget',data:COUNTRIES.map(c=>kb(kpi,'Net Profit (USD000)',c)),backgroundColor:'rgba(107,122,153,0.3)',borderColor:'rgba(107,122,153,0.6)',borderWidth:1,borderRadius:3},
+    {label:'Actual',data:COUNTRIES.map(c=>ka(kpi,'Net Profit (USD000)',c)),backgroundColor:COUNTRIES.map(c=>ka(kpi,'Net Profit (USD000)',c)<0?'rgba(244,63,94,0.7)':'rgba(20,184,166,0.7)'),borderWidth:0,borderRadius:3}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+ctx.raw.toFixed(0)+'k'}}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+v.toFixed(0)+'k',color:'#6b7a99'}}}}});
+}
+
+// ─── RENDER: DISBURSEMENT CHART ───────────────────────────────────────────────
+function renderDisbChart(kpi){
+  mkChart('disbChart',{type:'bar',data:{labels:COUNTRIES,datasets:[
+    {label:'Budget',data:COUNTRIES.map(c=>kb(kpi,'Disbursement (USD000)',c)),backgroundColor:'rgba(107,122,153,0.3)',borderColor:'rgba(107,122,153,0.6)',borderWidth:1,borderRadius:3},
+    {label:'Actual',data:COUNTRIES.map(c=>ka(kpi,'Disbursement (USD000)',c)),backgroundColor:'rgba(59,130,246,0.75)',borderWidth:0,borderRadius:3}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+ctx.raw.toFixed(1)+'k'}}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+v.toFixed(0)+'k',color:'#6b7a99'}}}}});
+}
+
+// ─── RENDER: OPS TABLE ───────────────────────────────────────────────────────
+function renderOpsTable(kpi){
+  const metrics=[
+    {label:'Avg Loan Size (USD)',      metric:'Average Loan Size (USD)',        fmt:v=>'$'+Math.round(v).toLocaleString()},
+    {label:'Borrowers / Branch',       metric:'Borrowers per Branch',           fmt:v=>Math.round(v).toLocaleString()},
+    {label:'Borrowers / Credit Officer',metric:'Borrowers per Credit Officer',  fmt:v=>Math.round(v).toLocaleString()},
+  ];
+  document.getElementById('ops-table-wrap').innerHTML=`
+  <table class="ops-table">
+    <thead><tr>
+      <th>Metric</th>
+      ${COUNTRIES.map(c=>`<th><span style="color:${COLORS[c]};">${FLAGS[c]}</span> ${c}</th>`).join('')}
+      <th style="color:var(--teal);">Consolidated</th>
+    </tr></thead>
+    <tbody>
+    ${metrics.map(m=>`<tr>
+      <td>${m.label}</td>
+      ${COUNTRIES.map(c=>{
+        const a=ka(kpi,m.metric,c), b=kb(kpi,m.metric,c);
+        return `<td>
+          <div style="color:${COLORS[c]};font-weight:600;">${m.fmt(a)}</div>
+          <div style="font-size:10px;color:var(--muted);">B: ${m.fmt(b)}</div>
+        </td>`;
+      }).join('')}
+      <td>
+        <div style="color:var(--teal);font-weight:700;">${m.fmt(ka(kpi,m.metric,'Consolidated'))}</div>
+        <div style="font-size:10px;color:var(--muted);">B: ${m.fmt(kb(kpi,m.metric,'Consolidated'))}</div>
+      </td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+}
+
+// ─── RENDER: TREND + CASH CHARTS ─────────────────────────────────────────────
+function renderTrendAndCash(trend,bs){
+  const months=['Jan-26','Feb-26','Mar-26'];
+  const glpB=months.map(m=>{const r=trend.find(x=>x['Line Item']==='Gross loan portfolio'&&x.Month===m&&x['Budget or Actual']==='Budget');return r?num(r['Value (USD000)']):0;});
+  const glpA=months.map(m=>{const r=trend.find(x=>x['Line Item']==='Gross loan portfolio'&&x.Month===m&&x['Budget or Actual']==='Actual');return r?num(r['Value (USD000)']):0;});
+  mkChart('portfolioChart',{type:'line',data:{labels:months,datasets:[
+    {label:'Budget',data:glpB,borderColor:'#14b8a6',backgroundColor:'rgba(20,184,166,0.07)',borderWidth:2,tension:0.3,fill:true,pointRadius:5,pointBackgroundColor:'#14b8a6'},
+    {label:'Actual',data:glpA,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.07)',borderWidth:2,borderDash:[4,4],tension:0.3,fill:true,pointRadius:5,pointBackgroundColor:'#3b82f6'}
+  ]},options:{responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+(ctx.raw/1000).toFixed(1)+'M'}}},
+    scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'M',color:'#6b7a99'}}}}});
+
+  const cashCountries=['Tanzania','Uganda','Liberia','Myanmar','Sierra Leone','Ghana','Rwanda','Kenya'];
+  const cashVals=cashCountries.map(c=>ba(bs,'Cash in hand & at Bank',c)+ba(bs,'Short term deposit',c));
+  mkChart('cashChart',{type:'bar',data:{labels:cashCountries,datasets:[{label:'Cash + STD',data:cashVals,backgroundColor:cashCountries.map(c=>COLORS[c]||'#888'),borderWidth:0,borderRadius:3}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+ctx.raw.toLocaleString()+'k'}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'M',color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99',font:{size:11}}}}}});
+}
+
+// ─── FALLBACK (hardcoded data shown before Google Sheet is connected) ─────────
+function renderFallback(){
+  // KPIs
+  document.getElementById('kpi-assets').textContent='$438.6M'; document.getElementById('kpi-assets-sub').textContent='Budget: $442.5M'; setDelta('kpi-assets-delta',438629,442500);
+  document.getElementById('kpi-glp').textContent='$270.9M';    document.getElementById('kpi-glp-sub').textContent='Budget: $266.8M';    setDelta('kpi-glp-delta',270869,266802);
+  document.getElementById('kpi-borrowers').textContent='1,000,311'; document.getElementById('kpi-borrowers-sub').textContent='Budget: 1,034,185'; setDelta('kpi-borrowers-delta',1000311,1034185);
+  document.getElementById('kpi-savers').textContent='892,530';  document.getElementById('kpi-savers-sub').textContent='Budget: 855,658';  setDelta('kpi-savers-delta',892530,855658);
+
+  // Country portfolio
+  const cData=[{name:'Tanzania',flag:'🇹🇿',val:113404,par:0.0355,color:'#14b8a6'},{name:'Uganda',flag:'🇺🇬',val:51246,par:0.0508,color:'#3b82f6'},{name:'Myanmar',flag:'🇲🇲',val:51282,par:0.0183,color:'#a78bfa'},{name:'Liberia',flag:'🇱🇷',val:28834,par:0.0126,color:'#f59e0b'},{name:'Sierra Leone',flag:'🇸🇱',val:14215,par:0.1151,color:'#fb7185'},{name:'Rwanda',flag:'🇷🇼',val:7407,par:0.0318,color:'#22c55e'},{name:'Ghana',flag:'🇬🇭',val:4481,par:0.0501,color:'#e879f9'}];
+  const maxV=113404;
+  document.getElementById('country-portfolio-list').innerHTML=cData.map(d=>{const pc=d.par<0.03?'par-ok':d.par<0.05?'par-warn':'par-alert';return`<div class="country-row"><span class="country-flag">${d.flag}</span><span class="country-name">${d.name}</span><div class="country-bar-wrap"><div class="country-bar" style="width:${(d.val/maxV*100).toFixed(1)}%;background:${d.color};"></div></div><span class="country-val">${d.val.toLocaleString()}</span><span class="country-par ${pc}">${(d.par*100).toFixed(1)}%</span></div>`;}).join('');
+
+  // Borrower chart
+  const years=[2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025];
+  const bData={Tanzania:[117343,135511,183182,197172,204103,203031,253627,318811,358984,401964,449272],Uganda:[169176,188159,194616,218598,216787,193731,163202,157669,178188,183403,185511],Myanmar:[16837,38270,50977,75998,124889,154119,144535,123870,113007,115353,132250],Liberia:[13180,17656,27010,34297,42047,39594,46516,58035,78006,106407,124038],'Sierra Leone':[23006,28674,37607,45870,56874,57174,64381,61657,69870,70827,64996],Rwanda:[0,0,0,0,2371,7196,18861,25255,31257,38679,43184],Ghana:[0,0,0,0,0,0,0,0,476,4626,12559]};
+  document.getElementById('borrower-legend').innerHTML=COUNTRIES.map(c=>`<div class="legend-item"><span class="legend-dot" style="background:${COLORS[c]};"></span>${c}</div>`).join('');
+  mkChart('borrowerChart',{type:'bar',data:{labels:years,datasets:COUNTRIES.map(c=>({label:c,data:bData[c]||years.map(_=>0),backgroundColor:COLORS[c],borderWidth:0}))},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': '+ctx.raw.toLocaleString()}}},scales:{x:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99',maxRotation:0}},y:{stacked:true,grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>(v/1000).toFixed(0)+'k',color:'#6b7a99'}}}}});
+
+  // Ratios
+  document.getElementById('bs-ratios').innerHTML=[{name:'Solvency Ratio',actual:'29.2%',budget:'B: 29.2%',w:29.2,color:'var(--teal)'},{name:'Debt to Equity',actual:'1.43x',budget:'B: 1.47x',w:48,color:'var(--blue)'},{name:'Debt to Assets',actual:'41.9%',budget:'B: 43.0%',w:41.9,color:'var(--amber)'},{name:'LLR / Loan Book',actual:'5.0%',budget:'B: 4.8%',w:15,color:'var(--coral)'}].map(r=>`<div class="ratio-item"><div class="ratio-name">${r.name}</div><div class="ratio-vals"><span class="ratio-actual" style="color:${r.color};">${r.actual}</span><span class="ratio-budget">${r.budget}</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${r.w}%;background:${r.color};"></div></div></div>`).join('');
+  document.getElementById('pl-ratios').innerHTML=[{name:'OSS',actual:'1.11x',budget:'B: 1.13x',w:100,color:'var(--green)'},{name:'Net Interest Margin',actual:'40.1%',budget:'B: 61.4%',w:40,color:'var(--purple)'},{name:'Cost of Debt',actual:'16.5%',budget:'B: 19.6%',w:40,color:'var(--amber)'},{name:'Net Profit (YTD)',actual:'$4,117k',budget:'B: $4,255k',w:96,color:'var(--green)'}].map(r=>`<div class="ratio-item"><div class="ratio-name">${r.name}</div><div class="ratio-vals"><span class="ratio-actual" style="color:${r.color};">${r.actual}</span><span class="ratio-budget">${r.budget}</span></div><div class="bar-wrap"><div class="bar-fill" style="width:${r.w}%;background:${r.color};"></div></div></div>`).join('');
+
+  // Net Profit chart
+  mkChart('profitChart',{type:'bar',data:{labels:COUNTRIES,datasets:[{label:'Budget',data:[3234,295,1090,404,223,238,-91],backgroundColor:'rgba(107,122,153,0.3)',borderColor:'rgba(107,122,153,0.6)',borderWidth:1,borderRadius:3},{label:'Actual',data:[2448,213,893,1317,16,86,-23],backgroundColor:[2448,213,893,1317,16,86,-23].map(v=>v<0?'rgba(244,63,94,0.7)':'rgba(20,184,166,0.7)'),borderWidth:0,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+ctx.raw.toFixed(0)+'k'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+v.toFixed(0)+'k',color:'#6b7a99'}}}}});
+
+  // Disbursement chart
+  mkChart('disbChart',{type:'bar',data:{labels:COUNTRIES,datasets:[{label:'Budget',data:[43897,31378,21953,15164,7598,4613,2901],backgroundColor:'rgba(107,122,153,0.3)',borderColor:'rgba(107,122,153,0.6)',borderWidth:1,borderRadius:3},{label:'Actual',data:[52755,27355,23611,20236,7189,4576,3180],backgroundColor:'rgba(59,130,246,0.75)',borderWidth:0,borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+ctx.raw.toFixed(1)+'k'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+v.toFixed(0)+'k',color:'#6b7a99'}}}}});
+
+  // Ops table
+  const opsRows=[
+    {label:'Avg Loan Size (USD)',fmt:v=>'$'+v,data:{Tanzania:{a:437,b:356},Uganda:{a:457,b:422},Myanmar:{a:628,b:580},Liberia:{a:433,b:426},'Sierra Leone':{a:412,b:402},Rwanda:{a:243,b:270},Ghana:{a:526,b:615}},consol:{a:452,b:400}},
+    {label:'Borrowers / Branch',fmt:v=>v.toLocaleString(),data:{Tanzania:{a:1995,b:1998},Uganda:{a:1095,b:1192},Myanmar:{a:1932,b:1941},Liberia:{a:2185,b:2264},'Sierra Leone':{a:1382,b:1395},Rwanda:{a:1277,b:1324},Ghana:{a:888,b:795}},consol:{a:1648,b:1682}},
+    {label:'Borrowers / Credit Officer',fmt:v=>v.toLocaleString(),data:{Tanzania:{a:270,b:265},Uganda:{a:187,b:200},Myanmar:{a:408,b:398},Liberia:{a:232,b:269},'Sierra Leone':{a:163,b:175},Rwanda:{a:163,b:197},Ghana:{a:158,b:189}},consol:{a:239,b:249}},
+  ];
+  document.getElementById('ops-table-wrap').innerHTML=`<table class="ops-table">
+    <thead><tr><th>Metric</th>${COUNTRIES.map(c=>`<th><span style="color:${COLORS[c]};">${FLAGS[c]}</span> ${c}</th>`).join('')}<th style="color:var(--teal);">Consolidated</th></tr></thead>
+    <tbody>${opsRows.map(m=>`<tr><td>${m.label}</td>${COUNTRIES.map(c=>`<td><div style="color:${COLORS[c]};font-weight:600;">${m.fmt(m.data[c]?.a||0)}</div><div style="font-size:10px;color:var(--muted);">B: ${m.fmt(m.data[c]?.b||0)}</div></td>`).join('')}<td><div style="color:var(--teal);font-weight:700;">${m.fmt(m.consol.a)}</div><div style="font-size:10px;color:var(--muted);">B: ${m.fmt(m.consol.b)}</div></td></tr>`).join('')}</tbody>
+  </table>`;
+
+  // Trend + Cash
+  mkChart('portfolioChart',{type:'line',data:{labels:['Jan-26','Feb-26','Mar-26'],datasets:[{label:'Budget',data:[270815,268100,266802],borderColor:'#14b8a6',backgroundColor:'rgba(20,184,166,0.07)',borderWidth:2,tension:0.3,fill:true,pointRadius:5,pointBackgroundColor:'#14b8a6'},{label:'Actual',data:[277898,276738,270869],borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.07)',borderWidth:2,borderDash:[4,4],tension:0.3,fill:true,pointRadius:5,pointBackgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.dataset.label+': $'+(ctx.raw/1000).toFixed(1)+'M'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'M',color:'#6b7a99'}}}}});
+  mkChart('cashChart',{type:'bar',data:{labels:['Tanzania','Uganda','Liberia','Myanmar','Sierra Leone','Ghana','Rwanda','Kenya'],datasets:[{label:'Cash + STD',data:[69035,35695,13976,7131,6576,1408,1327,807],backgroundColor:['#14b8a6','#3b82f6','#f59e0b','#a78bfa','#fb7185','#e879f9','#22c55e','#f43f5e'],borderWidth:0,borderRadius:3}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>'$'+ctx.raw.toLocaleString()+'k'}}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'M',color:'#6b7a99'}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#6b7a99',font:{size:11}}}}}});
+
+  document.getElementById('period-badge').textContent='March 2026 YTD';
+  document.getElementById('last-updated').textContent='Preview mode — connect Google Sheet to auto-update';
+}
+
+// ─── MAIN ─────────────────────────────────────────────────────────────────────
+async function loadDashboard(){
+
+  try{
+    const [bs,kpi,borrow,trend]=await Promise.all([fetchSheet(SHEETS.bs),fetchSheet(SHEETS.kpi),fetchSheet(SHEETS.borrow),fetchSheet(SHEETS.trend)]);
+    renderKPIs(bs,kpi); renderCountryPortfolio(bs,kpi); renderBorrowerChart(borrow);
+    renderRatios(kpi); renderProfitChart(kpi); renderDisbChart(kpi);
+    renderOpsTable(kpi); renderTrendAndCash(trend,bs);
+    document.getElementById('period-badge').textContent='March 2026 YTD';
+    document.getElementById('last-updated').textContent='Last updated: '+new Date().toLocaleString();
+    document.getElementById('loader').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+  }catch(err){
+    document.getElementById('loader').style.display='none';
+    document.getElementById('dashboard').style.display='block';
+    renderFallback();
+  }
+}
+loadDashboard();
+</script>
+</body>
+</html>
